@@ -5,7 +5,7 @@ class config(object):
 
     _vf_update_methods = ['LBFGS', 'GD']
 
-    policy_net_size = [64, 64]
+    policy_net_size = [32, 32]
     baseline_net_size = [128, 64, 32]
     init_log_var = -1   # e^-1
 
@@ -16,7 +16,7 @@ class config(object):
     animate = False
 
     timestep_limit = 10000
-    timesteps_per_batch = 10000
+    timesteps_per_batch = 8
     gamma = 0.99
     lam = 0.97
 

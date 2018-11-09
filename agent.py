@@ -190,7 +190,7 @@ class TrpoAgent(Agent):
         self.update_policy = TrpoUpdater(policy_net, config, self.logger)
         self.sess.run(tf.global_variables_initializer())
         # warm up agent.scalar
-        self._run_policy(batch_size=1000)
+        #self._run_policy(batch_size=1000)
 
 
 class PPOAgent(Agent):
@@ -203,4 +203,4 @@ class PPOAgent(Agent):
         self.update_policy = PPOUpdater(policy_net, config, self.logger)
         self.sess.run(tf.global_variables_initializer())
         # warm up agent.scalar
-        self._run_policy(batch_size=1000)
+        #self._run_policy(batch_size=1000)
