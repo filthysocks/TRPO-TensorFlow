@@ -12,7 +12,7 @@ class config(object):
     delta = 1e-2    # KL divergence between old and new policy (averaged over state-space)
     cg_damping = 1e-1
 
-    env_name = 'Hopper-v1'
+    env_name = 'MountainCarContinuous-v0'
     animate = False
 
     timestep_limit = 10000
