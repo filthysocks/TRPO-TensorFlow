@@ -1,4 +1,5 @@
 from agent import TrpoAgent, PPOAgent
+from env import Environments
 
 
 class config(object):
@@ -12,11 +13,10 @@ class config(object):
     delta = 1e-2    # KL divergence between old and new policy (averaged over state-space)
     cg_damping = 1e-1
 
-    env_name = 'MountainCarContinuous-v0'
     animate = False
 
-    timestep_limit = 10000
-    timesteps_per_batch = 8
+    timestep_limit = 999
+    timesteps_per_batch = 2000
     gamma = 0.99
     lam = 0.97
 
@@ -34,4 +34,5 @@ class config(object):
     update_epochs = 20
 
     agent = TrpoAgent
+    env = Environments.MOUNTAIN_CAR_CONTINUOUS
     iterations = 1000

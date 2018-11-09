@@ -68,12 +68,8 @@ class TrpoUpdater(object):
         feed_dict = {self.policy_net.obs_ph: observes,
                      self.policy_net.act_ph: actions,
                      self.policy_net.adv_ph: advantages}
-        old_means_np, old_log_vars_np = tf.get_default_session().run([self.policy_net.means,
-                                                                  self.policy_net.log_vars],
-                                                                 feed_dict)
-        feed_dict[self.policy_net.old_log_vars_ph] = old_log_vars_np
-        feed_dict[self.policy_net.old_means_ph] = old_means_np
 
+        feed_dict = self.policy_net.run_and_get_old_mean(feed_dict)
         prev_theta = self.get_flat_weights()
 
         def get_pg():
@@ -121,7 +117,6 @@ def linesearch(f, x, fullstep, expected_improve_rate, delta, max_backtracks=10, 
         expected_improve = expected_improve_rate * stepfrac
         ratio = actual_improve / expected_improve
         if ratio > accept_ratio and actual_improve > 0:
-            print(stepfrac)
             return True, xnew
     return False, x
 

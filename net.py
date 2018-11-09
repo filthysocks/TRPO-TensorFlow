@@ -3,6 +3,9 @@ import numpy as np
 import scipy.optimize
 from sklearn.utils import shuffle
 
+from env import Environment
+from typing import Mapping
+
 
 def flatgrad(loss, var_list):
     grads = tf.gradients(loss, var_list)
@@ -13,17 +16,19 @@ def flatgrad(loss, var_list):
 #               Policy Network
 # =============================================
 class PolicyNet(object):
-    def __init__(self, config, env, scope='policy'):
+    def __init__(self, config, env: Environment, scope='policy'):
         self.scope = scope
         self.net_size = config.policy_net_size
         self.init_log_var = config.init_log_var
         self.obs_dim = env.ob_dim + 1  # +1 for time dim
         self.act_dim = env.ac_dim
+        self.env = env
 
         self._build_net()
 
     def _build_net(self):
         with tf.variable_scope(self.scope):
+            self.env.action_distribution.init_vars()
             self._placeholders()
             self._policy_net()
             self._log_probs()
@@ -36,8 +41,6 @@ class PolicyNet(object):
         self.obs_ph = tf.placeholder(tf.float32, shape=(None, self.obs_dim), name='obs_ph')
         self.act_ph = tf.placeholder(tf.float32, shape=(None, self.act_dim), name='act_ph')
         self.adv_ph = tf.placeholder(tf.float32, shape=(None,), name='adv_ph')
-        # log_vars and means with pi_old (previous step's policy parameters):
-        self.old_log_vars_ph = tf.placeholder(tf.float32, (self.act_dim,), 'old_log_vars_ph')
         self.old_means_ph = tf.placeholder(tf.float32, (None, self.act_dim), 'old_means_ph')
 
     def _policy_net(self):
@@ -55,12 +58,11 @@ class PolicyNet(object):
                                   kernel_initializer=
                                   tf.random_normal_initializer(stddev=np.sqrt(1 / init_heu)), name=name)
             init_heu = hid_size
-        self.means = tf.layers.dense(out, self.act_dim, None,
-                                     kernel_initializer=
-                                     tf.random_normal_initializer(stddev=np.sqrt(1 / init_heu)), name="means")
-        # variance
-        self.log_vars = tf.get_variable('logvars', (self.act_dim,), tf.float32,
-                                        tf.constant_initializer(0.0)) + self.init_log_var
+        self.means = self.env.action_distribution.output_layer(out, init_heu)
+
+    def run_and_get_old_mean(self,
+                             feed_dict: Mapping[tf.Variable, tf.Tensor]):
+        return self.env.action_distribution.run_and_get_old_mean(feed_dict, self.means, self.old_means_ph)
 
     def _log_probs(self):
         """
@@ -71,17 +73,8 @@ class PolicyNet(object):
         these probabilities should be calculated in context of a multivariate gaussian distribution, see:
             https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Properties
         """
-        logp = -0.5 * tf.reduce_sum(self.log_vars)
-        logp += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.means) /
-                                     tf.exp(self.log_vars), axis=1)
-        self.logp = logp
-
-        logp_old = -0.5 * tf.reduce_sum(self.old_log_vars_ph)
-        logp_old += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.old_means_ph) /
-                                         tf.exp(self.old_log_vars_ph), axis=1)
-        self.logp_old = logp_old
-
-        # some constants have been dropped, due to the fact that the difference between two logs matters
+        self.logp = self.env.action_distribution.log_probs(self.act_ph, self.means, is_old=False)
+        self.logp_old = self.env.action_distribution.log_probs(self.act_ph, self.old_means_ph, is_old=True)
 
     def _kl_entropy(self):
         """
@@ -92,25 +85,15 @@ class PolicyNet(object):
         https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Kullback.E2.80.93Leibler_divergence
         https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Entropy
         """
-        log_det_cov_old = tf.reduce_sum(self.old_log_vars_ph)
-        log_det_cov_new = tf.reduce_sum(self.log_vars)
-        tr_old_new = tf.reduce_sum(tf.exp(self.old_log_vars_ph - self.log_vars))
-
-        self.kl = 0.5 * tf.reduce_mean(log_det_cov_new - log_det_cov_old + tr_old_new +
-                                       tf.reduce_sum(tf.square(self.means - self.old_means_ph) /
-                                                     tf.exp(self.log_vars), axis=1) -
-                                       self.act_dim)
-        self.entropy = 0.5 * (self.act_dim * (np.log(2 * np.pi) + 1) +
-                              tf.reduce_sum(self.log_vars))
+        self.kl = self.env.action_distribution.kl(self.means, self.old_means_ph)
+        self.entropy = self.env.action_distribution.entropy()
 
     def _sample(self):
         """
         sample from distribution, given observation. see:
             https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Drawing_values_from_the_distribution
         """
-        self.sampled_act = (self.means +
-                            tf.exp(self.log_vars / 2.0) *
-                            tf.random_normal(shape=(self.act_dim,), dtype=tf.float32))
+        self.sampled_act = self.env.action_distribution.sample(self.means)
 
     def _losses(self):
         """
@@ -136,7 +119,7 @@ class PolicyNet(object):
     def sample(self, obs):
         """Draw sample from policy distribution"""
         feed_dict = {self.obs_ph: obs}
-        return tf.get_default_session().run(self.sampled_act, feed_dict=feed_dict)
+        return tf.get_default_session().run([self.sampled_act, self.means], feed_dict=feed_dict)
 
     def get_trainables(self):
         return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.scope)

@@ -4,7 +4,7 @@ from datetime import datetime
 from net import PolicyNet, ValueNet
 from trpo import TrpoUpdater
 from ppo import PPOUpdater
-from env import Environment
+from env import Environment, Environments
 from utils import scaler, Logger
 import scipy.signal
 
@@ -13,15 +13,17 @@ class Agent(object):
     """
     This class is responsible for sampling from environment and making train sets
     """
-    def __init__(self, config, env, policy_net):
+    def __init__(self, config):
         # Set up the logger
+        self.sess = tf.Session()
+        self.sess.__enter__()
+        self.env = config.env(config)
+        self.policy_net = PolicyNet(config, self.env)
         now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")  # create unique directories
-        self.logger = Logger(logname=config.env_name, now=now)
+        self.logger = Logger(logname=self.env.name, now=now)
         # Initialize
-        self.env = env
-        self.policy_net = policy_net
-        self.baseline_net = ValueNet(config, env, self.logger)
-        self.scaler = scaler(env.ob_dim + 1)
+        self.baseline_net = ValueNet(config, self.env, self.logger)
+        self.scaler = scaler(self.env.ob_dim + 1)
         self.update_baseline = self.baseline_net.fit
         # Settings from config
         self.gamma = config.gamma
@@ -45,13 +47,14 @@ class Agent(object):
         scale, offset = self.scaler.get()
         scale[-1] = 1.0  # don't scale time step feature
         offset[-1] = 0.0  # don't offset time step feature
-        for _ in range(self.timestep_limit):
+        for time_step in range(self.timestep_limit):
             obs = obs.astype(np.float32).reshape((1, -1))
             obs = np.append(obs, [[step]], axis=1)  # add time step feature
             unscaled_obs.append(obs)
             obs = (obs - offset) * scale  # center and scale observations
             observes.append(obs)
-            action = self.policy_net.sample(obs).reshape((1, -1)).astype(np.float32)
+            action, means = self.policy_net.sample(obs)
+            action = action.reshape((1, -1)).astype(np.float32)
             actions.append(action)
             obs, reward, done, _ = self.env.step(np.squeeze(action, axis=0), animate)
             if not isinstance(reward, float):
@@ -59,6 +62,8 @@ class Agent(object):
             rewards.append(reward)
             step += 1e-2  # increment time step feature
             if done:
+                if time_step == (self.timestep_limit-1):
+                    done = False
                 break
 
         return (np.concatenate(observes), np.concatenate(actions),
@@ -182,25 +187,17 @@ class Agent(object):
 
 class TrpoAgent(Agent):
     def __init__(self, config):
-        env = Environment(config)
-        self.sess = tf.Session()
-        self.sess.__enter__()
-        policy_net = PolicyNet(config, env)
-        super().__init__(config, env, policy_net)
-        self.update_policy = TrpoUpdater(policy_net, config, self.logger)
+        super().__init__(config)
+        self.update_policy = TrpoUpdater(self.policy_net, config, self.logger)
         self.sess.run(tf.global_variables_initializer())
         # warm up agent.scalar
-        #self._run_policy(batch_size=1000)
+        self._run_policy(batch_size=1000)
 
 
 class PPOAgent(Agent):
     def __init__(self, config):
-        self.sess = tf.Session()
-        self.sess.__enter__()
-        env = Environment(config)
-        policy_net = PolicyNet(config, env)
-        super().__init__(config, env, policy_net)
-        self.update_policy = PPOUpdater(policy_net, config, self.logger)
+        super().__init__(config)
+        self.update_policy = PPOUpdater(self.policy_net, config, self.logger)
         self.sess.run(tf.global_variables_initializer())
         # warm up agent.scalar
-        #self._run_policy(batch_size=1000)
+        self._run_policy(batch_size=1000)
