@@ -25,7 +25,7 @@ class TrpoUpdater(object):
         self.pg = flatgrad(self.policy_net.surr, self.params)
 
     def _compute_hessian_vector_product(self):
-        self.shapes = [v.shape.as_list() for v in self.params]
+        self.shapes = [v.get_shape().as_list() for v in self.params]
         self.size_theta = np.sum([np.prod(shape) for shape in self.shapes])
         self.p = tf.placeholder(tf.float32, (self.size_theta,))  # the vector
         grads = tf.gradients(self.policy_net.kl_pen, self.params)

@@ -5,7 +5,7 @@ class config(object):
 
     _vf_update_methods = ['LBFGS', 'GD']
 
-    policy_net_size = [32, 32]
+    policy_net_size = [64, 64]
     baseline_net_size = [128, 64, 32]
     init_log_var = -1   # e^-1
 
@@ -33,5 +33,5 @@ class config(object):
     ppo_lr = None
     update_epochs = 20
 
-    agent = PPOAgent
+    agent = TrpoAgent
     iterations = 1000
