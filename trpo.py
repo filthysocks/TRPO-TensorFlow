@@ -94,7 +94,7 @@ class TrpoUpdater(object):
         success, theta = linesearch(get_loss, prev_theta, fullstep, -pg.dot(fullstep), self.delta)
         # print("success\n") if success else print("nope\n")
         self.assign_vars(theta)
-        policy_loss, kl_pen = tf.get_default_session().run([self.policy_net.surr, self.policy_net.kl_pen], feed_dict)
+        logp, logp_old, means, policy_loss, kl_pen = tf.get_default_session().run([self.policy_net.logp, self.policy_net.logp_old, self.policy_net.means, self.policy_net.surr, self.policy_net.kl_pen], feed_dict)
         self.logger.log({'Policy Loss': policy_loss, 'KL Penalty': kl_pen})
         # with self.policy_net.Graph.as_default():
         #     params = tf.trainable_variables()

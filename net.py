@@ -86,7 +86,7 @@ class PolicyNet(object):
         https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Entropy
         """
         self.kl = self.env.action_distribution.kl(self.means, self.old_means_ph)
-        self.entropy = self.env.action_distribution.entropy()
+        self.entropy = self.env.action_distribution.entropy(means=self.means)
 
     def _sample(self):
         """

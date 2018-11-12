@@ -15,8 +15,8 @@ class config(object):
 
     animate = False
 
-    timestep_limit = 999
-    timesteps_per_batch = 2000
+    timestep_limit = 3000
+    timesteps_per_batch = 100
     gamma = 0.99
     lam = 0.97
 
@@ -34,5 +34,5 @@ class config(object):
     update_epochs = 20
 
     agent = TrpoAgent
-    env = Environments.MOUNTAIN_CAR_CONTINUOUS
+    env = Environments.PENDULUM
     iterations = 1000

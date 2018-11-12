@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
+
+from action_distribution import Continuous
 from net import PolicyNet, ValueNet
 from trpo import TrpoUpdater
 from ppo import PPOUpdater
@@ -54,8 +56,13 @@ class Agent(object):
             obs = (obs - offset) * scale  # center and scale observations
             observes.append(obs)
             action, means = self.policy_net.sample(obs)
-            action = action.reshape((1, -1)).astype(np.float32)
-            actions.append(action)
+            if isinstance(self.env.action_distribution, Continuous):
+                action = action.reshape((1, -1)).astype(np.float32)
+                actions.append(action)
+            else:
+                action_hot_one = np.zeros(self.env.ac_dim)
+                action_hot_one[action] = 1
+                actions.append([action_hot_one])
             obs, reward, done, _ = self.env.step(np.squeeze(action, axis=0), animate)
             if not isinstance(reward, float):
                 reward = np.asscalar(reward)
